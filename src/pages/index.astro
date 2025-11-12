@@ -1,0 +1,21 @@
+---
+import Base from "../layouts/Base.astro";
+import "../styles/global.css";
+import SnakeGame from "../components/SnakeGame";
+import Leaderboard from "../components/Leaderboard";
+---
+<Base>
+  <Fragment slot="title">Modern Snake</Fragment>
+
+  <section class="mb-6">
+    <h1 class="text-3xl md:text-4xl font-extrabold">Modern Snake</h1>
+    <p class="text-muted mt-2 max-w-2xl">
+      Snake moderne en <strong>Astro + React</strong> avec canvas, effets glow, sons WebAudio, <em>wrap-around</em>,
+      et un leaderboard <strong>local</strong> (pas de backend).
+    </p>
+  </section>
+
+  <SnakeGame client:load />
+
+  <Leaderboard client:visible />
+</Base>

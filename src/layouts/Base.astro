@@ -1,0 +1,31 @@
+---
+import { ViewTransitions } from "astro:transitions";
+---
+<html lang="fr" class="min-h-full bg-bg text-fg">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="icon" href="/favicon.svg" />
+    <title><slot name="title" /> — Snake</title>
+    <meta name="description" content="Modern Snake game — Astro + React + Tailwind" />
+  </head>
+  <body class="min-h-screen bg-gradient-to-b from-bg to-black selection:bg-accent/30 selection:text-fg">
+    <ViewTransitions />
+    <header class="sticky top-0 z-30 backdrop-blur bg-bg/60 border-b border-border">
+      <div class="mx-auto max-w-5xl px-4 py-3 flex items-center justify-between">
+        <a href="/" class="font-semibold tracking-tight hover:text-accent transition">Snake</a>
+        <nav class="text-sm text-muted flex gap-4">
+          <a class="hover:text-fg transition" href="#howto">Comment jouer</a>
+          <a class="hover:text-fg transition" href="#leaderboard">Leaderboard</a>
+          <a class="hover:text-fg transition" href="https://github.com/" target="_blank" rel="noreferrer">GitHub</a>
+        </nav>
+      </div>
+    </header>
+    <main class="mx-auto max-w-5xl px-4 py-8">
+      <slot />
+    </main>
+    <footer class="mx-auto max-w-5xl px-4 py-12 text-center text-xs text-muted">
+      <p>Built with Astro + React + Tailwind • <a class="hover:text-accent" href="https://github.com/" target="_blank" rel="noreferrer">Source</a></p>
+    </footer>
+  </body>
+</html>
