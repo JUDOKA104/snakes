@@ -6,6 +6,6 @@ import tailwind from '@astrojs/tailwind';
 export default defineConfig({
   integrations: [react(), tailwind({ applyBaseStyles: false })],
   output: 'static',
-  site: 'https://<USERNAME>.github.io',
+  site: 'https://judoka104.github.io/snakes/',
   base: '/snake',
 });
