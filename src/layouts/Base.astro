@@ -1,31 +1,22 @@
 ---
-import { ViewTransitions } from "astro:transitions";
+const { title = "Portfolio", description = "Enzo Oriol – Portfolio", base = "/" } = Astro.props;
 ---
-<html lang="fr" class="min-h-full bg-bg text-fg">
+<html lang="fr">
   <head>
     <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <link rel="icon" href="/favicon.svg" />
-    <title><slot name="title" /> — Snake</title>
-    <meta name="description" content="Modern Snake game — Astro + React + Tailwind" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content={description} />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <title>{title}</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&display=swap" rel="stylesheet">
+    <style>body{font-family:Inter,system-ui,Segoe UI,Roboto,Helvetica,Arial,sans-serif}</style>
   </head>
-  <body class="min-h-screen bg-gradient-to-b from-bg to-black selection:bg-accent/30 selection:text-fg">
-    <ViewTransitions />
-    <header class="sticky top-0 z-30 backdrop-blur bg-bg/60 border-b border-border">
-      <div class="mx-auto max-w-5xl px-4 py-3 flex items-center justify-between">
-        <a href="/" class="font-semibold tracking-tight hover:text-accent transition">Snake</a>
-        <nav class="text-sm text-muted flex gap-4">
-          <a class="hover:text-fg transition" href="#howto">Comment jouer</a>
-          <a class="hover:text-fg transition" href="#leaderboard">Leaderboard</a>
-          <a class="hover:text-fg transition" href="https://github.com/" target="_blank" rel="noreferrer">GitHub</a>
-        </nav>
-      </div>
-    </header>
-    <main class="mx-auto max-w-5xl px-4 py-8">
+  <body class="min-h-screen bg-[var(--bg)] text-[var(--fg)]">
+    <main class="max-w-5xl mx-auto px-5 py-10">
       <slot />
     </main>
-    <footer class="mx-auto max-w-5xl px-4 py-12 text-center text-xs text-muted">
-      <p>Built with Astro + React + Tailwind • <a class="hover:text-accent" href="https://github.com/" target="_blank" rel="noreferrer">Source</a></p>
-    </footer>
+    <script defer data-domain="your-domain" src=""></script>
   </body>
 </html>

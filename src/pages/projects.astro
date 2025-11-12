@@ -1,0 +1,13 @@
+---
+import Base from "../layouts/Base.astro";
+import ProjectCard from "../components/ProjectCard";
+import projects from "../data/projects.json";
+---
+<Base title="Projets — Enzo Oriol">
+  <h2 class="text-3xl font-bold mb-4">Projets</h2>
+  <div class="grid md:grid-cols-2 gap-5">
+    {projects.map(p => (
+      <ProjectCard {...p} />
+    ))}
+  </div>
+</Base>

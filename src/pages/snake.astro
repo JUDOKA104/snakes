@@ -1,0 +1,12 @@
+---
+import Base from "../layouts/Base.astro";
+import SnakeGame from "../components/SnakeGame";
+---
+
+<Base title="Snake — Astro React" description="Petit jeu Snake en React dans Astro, avec score, taille de grille, sons et leaderboard local.">
+  <h1 class="text-3xl font-bold mb-4 text-center">🐍 Snake</h1>
+  <p class="text-center opacity-80 mb-6">Flèches / WASD • Espace = Pause • R = Rejouer • Swipe sur mobile</p>
+  <div class="asus-rog-card p-4">
+    <SnakeGame client:load />
+  </div>
+</Base>

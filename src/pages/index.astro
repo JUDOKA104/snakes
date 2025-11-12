@@ -1,21 +1,16 @@
 ---
 import Base from "../layouts/Base.astro";
-import "../styles/global.css";
-import SnakeGame from "../components/SnakeGame";
-import Leaderboard from "../components/Leaderboard";
+import Hero from "../components/Hero";
 ---
-<Base>
-  <Fragment slot="title">Modern Snake</Fragment>
-
-  <section class="mb-6">
-    <h1 class="text-3xl md:text-4xl font-extrabold">Modern Snake</h1>
-    <p class="text-muted mt-2 max-w-2xl">
-      Snake moderne en <strong>Astro + React</strong> avec canvas, effets glow, sons WebAudio, <em>wrap-around</em>,
-      et un leaderboard <strong>local</strong> (pas de backend).
-    </p>
+<Base title="Enzo Oriol — Portfolio">
+  <Hero client:load />
+  <section class="grid md:grid-cols-3 gap-5">
+    <a class="asus-rog-card" href="/projects">Derniers projets</a>
+    <a class="asus-rog-card" href="/resume">CV & compétences</a>
+    <a class="asus-rog-card" href="/contact">Contact</a>
   </section>
-
-  <SnakeGame client:load />
-
-  <Leaderboard client:visible />
 </Base>
+
+
+<!-- Lien vers le jeu -->
+<p class="mt-6 text-center"><a class="underline" href="/snake">Jouer à Snake</a></p>

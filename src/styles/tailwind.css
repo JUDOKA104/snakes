@@ -1,0 +1,18 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --bg: #0b0c0e;
+  --fg: #e6e8ea;
+  --muted: #9aa3ad;
+  --accent: #005A1E;
+}
+html, body {
+  background: var(--bg);
+  color: var(--fg);
+}
+.asus-rog-card {
+  @apply rounded-2xl p-6 shadow-xl bg-zinc-900/60 border border-zinc-800;
+}
+a { @apply underline decoration-transparent hover:decoration-current transition; }

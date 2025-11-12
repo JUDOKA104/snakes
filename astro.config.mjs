@@ -1,11 +1,10 @@
 import { defineConfig } from 'astro/config';
 import react from '@astrojs/react';
-import tailwind from '@astrojs/tailwind';
 
-// ⚠️ For GitHub Pages, set `site` to your Pages URL and `base` to your repo name (e.g., '/snake').
+// If you publish under https://<user>.github.io/<repo>, set base to '/<repo>' later.
 export default defineConfig({
-  integrations: [react(), tailwind({ applyBaseStyles: false })],
+  integrations: [react()],
   output: 'static',
-  site: 'https://judoka104.github.io/snakes/',
-  base: '/snake',
+  site: 'https://example.com', // replace with your real URL later
+  prefetch: true
 });

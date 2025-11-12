@@ -1,0 +1,32 @@
+[
+  {
+    "title": "Odoo 18 – Fiche de poste",
+    "tags": [
+      "Odoo",
+      "QWeb",
+      "PDF layout"
+    ],
+    "description": "Application RH avec vues avancées, tags et rapports PDF personnalisés.",
+    "repo": "https://github.com/your-user/odoo-fiche-de-poste"
+  },
+  {
+    "title": "Portal Helpdesk – Modal create",
+    "tags": [
+      "Odoo 18",
+      "OWL 2",
+      "JS"
+    ],
+    "description": "Bouton 'Create New' ouvrant une modale avec formulaire et ACL personnalisés.",
+    "repo": "https://github.com/your-user/psai_portal_helpdesk"
+  },
+  {
+    "title": "Cyber – Hardening Linux",
+    "tags": [
+      "Linux",
+      "Security",
+      "PKI"
+    ],
+    "description": "TP complet : LUKS, 2FA SSH, reverse proxy sécurisé, PKI interne.",
+    "repo": "https://github.com/your-user/hardening-linux"
+  }
+]
