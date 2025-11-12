@@ -5,6 +5,6 @@ import react from '@astrojs/react';
 export default defineConfig({
   integrations: [react()],
   output: 'static',
-  site: 'https://example.com', // replace with your real URL later
+  site: 'https://judoka104.github.io/snakes/', // replace with your real URL later
   prefetch: true
 });
