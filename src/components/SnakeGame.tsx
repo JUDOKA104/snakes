@@ -1,370 +1,403 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 
+/** ===== Types & Utils ===== */
 type Point = { x: number; y: number };
 type Dir = "UP" | "DOWN" | "LEFT" | "RIGHT";
+type Particle = { x: number; y: number; vx: number; vy: number; life: number; color: string; size: number };
 
 const clamp = (n: number, min: number, max: number) => Math.max(min, Math.min(max, n));
+const eq = (a: Point, b: Point) => a.x === b.x && a.y === b.y;
+const randCell = (max: number) => Math.floor(Math.random() * max);
 
+function nextHead(h: Point, d: Dir): Point {
+  switch (d) {
+    case "UP": return { x: h.x, y: h.y - 1 };
+    case "DOWN": return { x: h.x, y: h.y + 1 };
+    case "LEFT": return { x: h.x - 1, y: h.y };
+    default: return { x: h.x + 1, y: h.y };
+  }
+}
+function isOpposite(d1: Dir, d2: Dir) {
+  return (d1 === "UP" && d2 === "DOWN") || (d1 === "DOWN" && d2 === "UP") ||
+    (d1 === "LEFT" && d2 === "RIGHT") || (d1 === "RIGHT" && d2 === "LEFT");
+}
+function lerp(a: number, b: number, t: number) { return a + (b - a) * t; }
+function lerpPoint(a: Point, b: Point, t: number): Point { return { x: lerp(a.x, b.x, t), y: lerp(a.y, b.y, t) }; }
+
+/** ===== Audio Engine ===== */
 function useAudio() {
   const ctxRef = useRef<AudioContext | null>(null);
   const enabledRef = useRef(true);
 
-  const ensureCtx = () => {
-    if (!ctxRef.current) ctxRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
-    return ctxRef.current;
+  const ensure = () => {
+    if (typeof window === "undefined") return null;
+    return (ctxRef.current ??= new (window.AudioContext || (window as any).webkitAudioContext)());
   };
 
-  const playBeep = (freq=440, dur=0.06, type: OscillatorType="sine", vol=0.08) => {
+  const playTone = (freq: number, type: OscillatorType, dur: number, vol: number) => {
     if (!enabledRef.current) return;
-    const ctx = ensureCtx();
-    const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
-    osc.type = type;
-    osc.frequency.value = freq;
-    gain.gain.value = vol;
-    osc.connect(gain).connect(ctx.destination);
-    osc.start();
-    osc.stop(ctx.currentTime + dur);
+    try {
+      const c = ensure();
+      if (!c || c.state === "suspended") c?.resume();
+      if (!c) return;
+      const o = c.createOscillator();
+      const g = c.createGain();
+      o.type = type;
+      o.frequency.setValueAtTime(freq, c.currentTime);
+      g.gain.setValueAtTime(vol, c.currentTime);
+      g.gain.exponentialRampToValueAtTime(0.001, c.currentTime + dur);
+      o.connect(g).connect(c.destination);
+      o.start();
+      o.stop(c.currentTime + dur + 0.1);
+    } catch { }
   };
 
-  const eat = () => { playBeep(660, 0.05, "triangle"); };
-  const step = () => { playBeep(220, 0.02, "square", 0.02); };
-  const die = () => {
-    // sweep down
-    if (!enabledRef.current) return;
-    const ctx = ensureCtx();
-    const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
-    osc.type = "sawtooth";
-    osc.frequency.setValueAtTime(880, ctx.currentTime);
-    osc.frequency.exponentialRampToValueAtTime(80, ctx.currentTime + 0.4);
-    gain.gain.value = 0.1;
-    gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.4);
-    osc.connect(gain).connect(ctx.destination);
-    osc.start();
-    osc.stop(ctx.currentTime + 0.45);
+  return {
+    eat: () => { playTone(600, "sine", 0.1, 0.1); setTimeout(() => playTone(900, "sine", 0.15, 0.1), 50); },
+    step: () => playTone(150, "triangle", 0.05, 0.02),
+    die: () => { playTone(200, "sawtooth", 0.4, 0.2); setTimeout(() => playTone(100, "sawtooth", 0.4, 0.2), 100); },
+    toggle: (on: boolean) => { enabledRef.current = on; }
   };
-
-  const toggle = (on: boolean) => { enabledRef.current = on; };
-
-  return { eat, step, die, toggle };
 }
 
+/** ===== Swipe Handler ===== */
 function useSwipe(onDir: (d: Dir) => void) {
   const start = useRef<Point | null>(null);
   useEffect(() => {
-    const onTouchStart = (e: TouchEvent) => {
-      const t = e.touches[0];
-      start.current = { x: t.clientX, y: t.clientY };
-    };
+    const onTouchStart = (e: TouchEvent) => { start.current = { x: e.touches[0].clientX, y: e.touches[0].clientY }; };
     const onTouchEnd = (e: TouchEvent) => {
       if (!start.current) return;
-      const t = e.changedTouches[0];
-      const dx = t.clientX - start.current.x;
-      const dy = t.clientY - start.current.y;
-      if (Math.abs(dx) > Math.abs(dy)) {
-        onDir(dx > 0 ? "RIGHT" : "LEFT");
-      } else {
-        onDir(dy > 0 ? "DOWN" : "UP");
-      }
+      const dx = e.changedTouches[0].clientX - start.current.x;
+      const dy = e.changedTouches[0].clientY - start.current.y;
+      if (Math.abs(dx) > Math.abs(dy)) onDir(dx > 0 ? "RIGHT" : "LEFT");
+      else onDir(dy > 0 ? "DOWN" : "UP");
       start.current = null;
     };
     window.addEventListener("touchstart", onTouchStart, { passive: true });
-    window.addEventListener("touchend", onTouchEnd, { passive: true });
-    return () => {
-      window.removeEventListener("touchstart", onTouchStart);
-      window.removeEventListener("touchend", onTouchEnd);
-    };
+    window.addEventListener("touchend", onTouchEnd);
+    return () => { window.removeEventListener("touchstart", onTouchStart); window.removeEventListener("touchend", onTouchEnd); };
   }, [onDir]);
 }
 
-function randCell(max: number) {
-  return Math.floor(Math.random() * max);
-}
-
-function nextHead(head: Point, dir: Dir): Point {
-  switch (dir) {
-    case "UP": return { x: head.x, y: head.y - 1 };
-    case "DOWN": return { x: head.x, y: head.y + 1 };
-    case "LEFT": return { x: head.x - 1, y: head.y };
-    case "RIGHT": return { x: head.x + 1, y: head.y };
-  }
-}
-
-function eq(a: Point, b: Point) { return a.x === b.x && a.y === b.y; }
-
+/** ===== Leaderboard ===== */
 function useLeaderboard() {
-  type Entry = { score: number; size: string; date: string };
-  const KEY = "snake.leaderboard.v1";
-  const read = (): Entry[] => {
-    try { return JSON.parse(localStorage.getItem(KEY) || "[]"); } catch { return []; }
+  const KEY = "snake.lb.v2";
+  const get = () => { try { return JSON.parse(localStorage.getItem(KEY) || "[]"); } catch { return []; } };
+  const push = (score: number, mode: string) => {
+    const d = get(); d.push({ score, mode, date: Date.now() });
+    d.sort((a: any, b: any) => b.score - a.score);
+    localStorage.setItem(KEY, JSON.stringify(d.slice(0, 50)));
   };
-  const write = (arr: Entry[]) => localStorage.setItem(KEY, JSON.stringify(arr.slice(0, 50)));
-  const push = (score: number, size: string) => {
-    const arr = read();
-    arr.push({ score, size, date: new Date().toISOString() });
-    arr.sort((a,b)=>b.score-a.score);
-    write(arr);
-  };
-  const list = (size?: string) => {
-    const arr = read();
-    return size ? arr.filter(e=>e.size===size).slice(0, 10) : arr.slice(0, 10);
-  };
-  const reset = () => localStorage.removeItem(KEY);
-  return { push, list, reset };
+  return { list: (m: string) => get().filter((x: any) => x.mode === m).slice(0, 5), push, reset: () => localStorage.removeItem(KEY) };
 }
 
+/** █████  ULTIMATE SNAKE COMPONENT  █████ */
 export default function SnakeGame() {
-  const [cols, setCols] = useState(10);
-  const [rows, setRows] = useState(10);
-  const [speed, setSpeed] = useState(8); // steps/sec
+  const [cols, setCols] = useState(12);
+  const [rows, setRows] = useState(12);
+
+  const [snake, setSnake] = useState<Point[]>([{ x: 2, y: 0 }, { x: 1, y: 0 }, { x: 0, y: 0 }]);
+  const [food, setFood] = useState<Point>({ x: 5, y: 5 });
   const [score, setScore] = useState(0);
-  const [best, setBest] = useState(0);
-  const [paused, setPaused] = useState(false);
-  const [gameOver, setGameOver] = useState(false);
+  const [highScore, setHighScore] = useState(0);
+  const [status, setStatus] = useState<"MENU" | "PLAYING" | "PAUSED" | "GAMEOVER">("MENU");
   const [sfxOn, setSfxOn] = useState(true);
 
-  const lb = useLeaderboard();
+  // Refs Logique
+  const snakeRef = useRef(snake);
+  const moveQueue = useRef<Dir[]>([]);
+  const currentDir = useRef<Dir>("RIGHT");
+
+  // Refs Interpolation
+  const prevSnakeRef = useRef<Point[]>(snake);
+  const nextSnakeRef = useRef<Point[]>(snake);
+  const lastTimeRef = useRef<number>(0);
+  const accumulatorRef = useRef<number>(0);
+  const [interpolationT, setInterpolationT] = useState(0);
+
+  const shakeIntensity = useRef(0);
   const audio = useAudio();
-  useEffect(()=>audio.toggle(sfxOn),[sfxOn]);
-
+  const lb = useLeaderboard();
   const sizeKey = `${cols}x${rows}`;
-  useEffect(()=>{
-    // best for this size
-    const list = lb.list(sizeKey);
-    setBest(list[0]?.score ?? 0);
-  }, [cols, rows]);
 
-  const particleRef = useRef<HTMLCanvasElement | null>(null);
-  const gridRef = useRef<HTMLDivElement | null>(null);
+  const speedMs = Math.max(60, 130 - Math.floor(score / 2) * 5);
 
-  const [dir, setDir] = useState<Dir>("RIGHT");
-  const [snake, setSnake] = useState<Point[]>([{x:2,y:0},{x:1,y:0},{x:0,y:0}]);
-  const [food, setFood] = useState<Point>({x: 5, y: 5});
-
-  // init/restart when size changes
-  useEffect(()=>{
-    setSnake([{x:2,y:0},{x:1,y:0},{x:0,y:0}]);
-    setFood({x: clamp(Math.floor(cols/2),0,cols-1), y: clamp(Math.floor(rows/2),0,rows-1)});
-    setDir("RIGHT");
-    setScore(0);
-    setGameOver(false);
-    setPaused(false);
-  }, [cols, rows]);
-
-  // input
-  useEffect(()=>{
-    const onKey = (e: KeyboardEvent) => {
-      const k = e.key.toLowerCase();
-      const toDir = (d: Dir) => {
-        setDir(prev => {
-          if ((prev === "UP" && d === "DOWN") || (prev === "DOWN" && d === "UP") ||
-              (prev === "LEFT" && d === "RIGHT") || (prev === "RIGHT" && d === "LEFT")) return prev;
-          return d;
-        });
-      };
-      if (k === "arrowup" || k === "w") toDir("UP");
-      else if (k === "arrowdown" || k === "s") toDir("DOWN");
-      else if (k === "arrowleft" || k === "a") toDir("LEFT");
-      else if (k === "arrowright" || k === "d") toDir("RIGHT");
-      else if (k === " "){ setPaused(p=>!p); }
-      else if (k === "r"){ restart(); }
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
+  // --- Init ---
+  useEffect(() => {
+    try {
+      const v = (localStorage.getItem("snake.sfx") ?? "1") === "1";
+      setSfxOn(v); audio.toggle(v);
+    } catch { }
   }, []);
 
-  useSwipe((d)=>{
-    setDir(prev => {
-      if ((prev === "UP" && d === "DOWN") || (prev === "DOWN" && d === "UP") ||
-          (prev === "LEFT" && d === "RIGHT") || (prev === "RIGHT" && d === "LEFT")) return prev;
-      return d;
-    });
-  });
+  useEffect(() => {
+    audio.toggle(sfxOn);
+    try { localStorage.setItem("snake.sfx", sfxOn ? "1" : "0"); } catch { }
+  }, [sfxOn]);
 
-  const placeFood = (body: Point[]) => {
-    let p: Point;
-    do {
-      p = { x: randCell(cols), y: randCell(rows) };
-    } while (body.some(s => eq(s, p)));
+  useEffect(() => {
+    const list = lb.list(sizeKey);
+    setHighScore(list[0]?.score || 0);
+  }, [cols, rows, status]);
+
+  // --- Actions ---
+  const startGame = () => {
+    const init = [{ x: 2, y: 0 }, { x: 1, y: 0 }, { x: 0, y: 0 }];
+    setSnake(init);
+    snakeRef.current = init;
+    prevSnakeRef.current = init;
+    nextSnakeRef.current = init;
+    currentDir.current = "RIGHT";
+    moveQueue.current = [];
+    setScore(0);
+    lastTimeRef.current = performance.now();
+    accumulatorRef.current = 0;
+    setInterpolationT(0);
+    spawnFood(init);
+    setStatus("PLAYING");
+  };
+
+  const spawnFood = (body: Point[]) => {
+    let p: Point, t = 0;
+    do { p = { x: randCell(cols), y: randCell(rows) }; t++; }
+    while (body.some(s => eq(s, p)) && t < 100);
     setFood(p);
   };
 
-  const explode = () => {
-    const canvas = particleRef.current;
-    if (!canvas) return;
-    const grid = gridRef.current;
-    const rect = grid?.getBoundingClientRect();
-    canvas.width = rect?.width ?? 600;
-    canvas.height = rect?.height ?? 600;
-    const ctx = canvas.getContext("2d")!;
-    const parts = Array.from({length: 120}).map(()=> ({
-      x: (rect?.width ?? 0)/2,
-      y: (rect?.height ?? 0)/2,
-      vx: (Math.random()*2-1)*4,
-      vy: (Math.random()*2-1)*4,
-      life: 40+Math.random()*30
-    }));
-    let tick = 0;
-    const id = requestAnimationFrame(function loop(){
-      tick++;
-      ctx.clearRect(0,0,canvas.width, canvas.height);
-      for (const p of parts) {
-        p.x += p.vx; p.y += p.vy; p.vy += 0.05; p.life--;
-        ctx.globalAlpha = Math.max(0, p.life/80);
-        ctx.fillRect(p.x, p.y, 3, 3);
+  const addInput = (d: Dir) => {
+    const last = moveQueue.current.length > 0 ? moveQueue.current[moveQueue.current.length - 1] : currentDir.current;
+    if (!isOpposite(last, d) && last !== d && moveQueue.current.length < 3) moveQueue.current.push(d);
+  };
+
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      const k = e.key.toLowerCase();
+      if (["arrowup", "w"].includes(k)) addInput("UP");
+      else if (["arrowdown", "s"].includes(k)) addInput("DOWN");
+      else if (["arrowleft", "a"].includes(k)) addInput("LEFT");
+      else if (["arrowright", "d"].includes(k)) addInput("RIGHT");
+      else if (k === " ") {
+        if (status === "PLAYING") setStatus("PAUSED");
+        else if (status === "PAUSED") setStatus("PLAYING");
       }
-      if (tick < 80) requestAnimationFrame(loop);
-      else ctx.clearRect(0,0,canvas.width,canvas.height);
-    });
-  };
+      else if (k === "r") startGame();
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [status]);
 
-  // game loop
-  useEffect(()=>{
-    if (paused || gameOver) return;
-    const interval = 1000 / clamp(speed, 2, 30);
-    const id = setInterval(()=>{
-      setSnake(prev => {
-        const head = prev[0];
-        const nh = nextHead(head, dir);
-        // wrap around (torus) or collide -> choose wrap for fun; collide with self is death
-        if (nh.x < 0) nh.x = cols-1;
-        if (nh.x >= cols) nh.x = 0;
-        if (nh.y < 0) nh.y = rows-1;
-        if (nh.y >= rows) nh.y = 0;
+  useSwipe(d => addInput(d));
 
-        if (prev.some((p,i)=> i!==0 && eq(p, nh))) {
-          // death
-          audio.die();
-          explode();
-          setGameOver(true);
-          lb.push(score, sizeKey);
-          setBest(b=>Math.max(b, score));
-          return prev;
-        }
-        const ate = eq(nh, food);
-        const body = [nh, ...prev];
-        if (!ate) body.pop();
-        if (ate) {
-          setScore(s => s + 1);
-          audio.eat();
-          placeFood(body);
-        } else {
-          audio.step();
-        }
-        return body;
+  // --- Particles ---
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const particlesRef = useRef<Particle[]>([]);
+
+  const spawnParticles = (x: number, y: number, type: "EAT" | "DIE") => {
+    const rect = canvasRef.current?.getBoundingClientRect();
+    if (!rect) return;
+    const count = type === "EAT" ? 20 : 60;
+    const px = (x + 0.5) * (rect.width / cols);
+    const py = (y + 0.5) * (rect.height / rows);
+    for (let i = 0; i < count; i++) {
+      const angle = Math.random() * Math.PI * 2;
+      const speed = Math.random() * (type === "EAT" ? 4 : 8);
+      particlesRef.current.push({
+        x: px, y: py,
+        vx: Math.cos(angle) * speed, vy: Math.sin(angle) * speed,
+        life: 1.0, color: type === "EAT" ? (Math.random() > 0.5 ? "#fbbf24" : "#34d399") : "#f87171",
+        size: Math.random() * 4 + 2
       });
-    }, interval);
-    return ()=>clearInterval(id);
-  }, [dir, speed, paused, gameOver, cols, rows, food, score]);
-
-  const cells = useMemo(()=> rows*cols, [rows, cols]);
-  const percent = Math.min(100, (score / Math.max(1,cells-3)) * 100);
-
-  const restart = () => {
-    setSnake([{x:2,y:0},{x:1,y:0},{x:0,y:0}]);
-    setFood({x: clamp(Math.floor(cols/2),0,cols-1), y: clamp(Math.floor(rows/2),0,rows-1)});
-    setDir("RIGHT");
-    setScore(0);
-    setGameOver(false);
-    setPaused(false);
+    }
   };
+
+  // --- Game Tick ---
+  const gameTick = () => {
+    if (moveQueue.current.length > 0) currentDir.current = moveQueue.current.shift() as Dir;
+    const head = snakeRef.current[0];
+    const next = nextHead(head, currentDir.current);
+
+    const wall = next.x < 0 || next.x >= cols || next.y < 0 || next.y >= rows;
+    const self = snakeRef.current.some((p, i) => i !== 0 && eq(p, next));
+
+    if (wall || self) {
+      audio.die();
+      setStatus("GAMEOVER");
+      spawnParticles(head.x, head.y, "DIE");
+      shakeIntensity.current = 20;
+      lb.push(score, sizeKey);
+      return false;
+    }
+
+    const ate = eq(next, food);
+    const newBody = [next, ...snakeRef.current];
+    if (!ate) newBody.pop();
+
+    prevSnakeRef.current = snakeRef.current;
+    nextSnakeRef.current = newBody;
+    snakeRef.current = newBody;
+
+    if (ate) {
+      setScore(s => s + 1); spawnFood(newBody);
+      spawnParticles(next.x, next.y, "EAT"); shakeIntensity.current = 5; audio.eat();
+    } else { audio.step(); }
+
+    setSnake(newBody);
+    return true;
+  };
+
+  // --- Loop Principal ---
+  useEffect(() => {
+    let raf = 0;
+    const ctx = canvasRef.current?.getContext("2d");
+    lastTimeRef.current = performance.now();
+    accumulatorRef.current = 0;
+
+    const loop = (currentTime: number) => {
+      raf = requestAnimationFrame(loop);
+      let deltaTime = currentTime - lastTimeRef.current;
+      lastTimeRef.current = currentTime;
+      if (deltaTime > 250) deltaTime = 250;
+
+      if (status === "PLAYING") {
+        accumulatorRef.current += deltaTime;
+        while (accumulatorRef.current >= speedMs) {
+          if (!gameTick()) break;
+          accumulatorRef.current -= speedMs;
+        }
+        setInterpolationT(accumulatorRef.current / speedMs);
+      } else { setInterpolationT(1); }
+
+      // Render
+      if (shakeIntensity.current > 0) {
+        const amt = shakeIntensity.current;
+        setShakeOffset({ x: (Math.random() - 0.5) * amt, y: (Math.random() - 0.5) * amt });
+        shakeIntensity.current *= 0.9;
+        if (shakeIntensity.current < 0.5) shakeIntensity.current = 0;
+      } else { setShakeOffset({ x: 0, y: 0 }); }
+
+      if (ctx && canvasRef.current) {
+        ctx.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height);
+        for (let i = particlesRef.current.length - 1; i >= 0; i--) {
+          const p = particlesRef.current[i];
+          p.x += p.vx; p.y += p.vy; p.vy += 0.15; p.life -= 0.02;
+          if (p.life <= 0) particlesRef.current.splice(i, 1);
+          else {
+            ctx.fillStyle = p.color; ctx.globalAlpha = p.life; ctx.beginPath();
+            ctx.arc(p.x, p.y, p.size * p.life, 0, Math.PI * 2); ctx.fill();
+          }
+        }
+      }
+    };
+    raf = requestAnimationFrame(loop);
+    return () => cancelAnimationFrame(raf);
+  }, [status, cols, rows, food, speedMs, score, sizeKey]);
+
+  const [shakeOffset, setShakeOffset] = useState({ x: 0, y: 0 });
+
+  const visSnake = useMemo(() => {
+    const prev = prevSnakeRef.current;
+    const next = nextSnakeRef.current;
+    if (!prev.length || !next.length) return snake;
+    const t = clamp(interpolationT, 0, 1);
+    return next.map((n, i) => {
+      const p = prev[i] ?? prev[prev.length - 1];
+      return lerpPoint(p, n, t);
+    });
+  }, [interpolationT, snake]);
+
+  const cellW = 100 / cols; const cellH = 100 / rows;
+  const getHeadRotation = () => {
+    switch (currentDir.current) {
+      case "UP": return "rotate-180"; case "DOWN": return "rotate-0";
+      case "LEFT": return "rotate-90"; case "RIGHT": return "-rotate-90"; default: return "rotate-0";
+    }
+  };
+  const getStyle = (p: Point, scale = 1.05) => ({
+    left: `${(p.x + 0.5) * cellW}%`, top: `${(p.y + 0.5) * cellH}%`,
+    width: `${cellW * scale}%`, height: `${cellH * scale}%`,
+  });
 
   return (
-    <div className="max-w-3xl mx-auto">
-      <div className="flex flex-wrap items-center gap-3 justify-between mb-3">
-        <div className="flex items-center gap-3">
-          <label className="text-sm opacity-80">Taille</label>
-          <select className="bg-transparent border rounded px-2 py-1"
-            value={`${cols}x${rows}`}
-            onChange={e=>{
-              const [c,r] = e.target.value.split("x").map(Number);
-              setCols(c); setRows(r);
-            }}>
-            {[5,8,10,12,15,20].map(n=>(
-              <option key={n} value={`${n}x${n}`}>{n}×{n}</option>
-            ))}
-          </select>
+    // Suppression des max-w et width fixe, le composant prend 100% de son parent
+    <div className="w-full h-full flex flex-col items-center justify-center touch-none select-none relative">
 
-          <label className="text-sm opacity-80">Vitesse</label>
-          <input type="range" min={2} max={30} value={speed}
-            onChange={e=>setSpeed(parseInt(e.target.value))} />
-          <span className="tabular-nums text-sm">{speed} t/s</span>
+      {/* HUD (Absolute au-dessus du jeu ou intégré dans le panneau) */}
+      <div className="absolute -top-16 left-0 right-0 flex items-end justify-between px-2">
+        <div>
+          <div className="text-[10px] font-bold tracking-[0.2em] text-emerald-500/80 uppercase mb-1">Score</div>
+          <div className="text-4xl font-black text-white glow-text-green tabular-nums leading-[0.8]">{score}</div>
         </div>
 
-        <div className="flex items-center gap-2">
-          <button className="border rounded px-2 py-1" onClick={()=>setSfxOn(s=>!s)}>
-            {sfxOn ? "🔊 SFX" : "🔈 Muet"}
-          </button>
-          <button className="border rounded px-2 py-1" onClick={restart}>↻ Rejouer</button>
-          <button className="border rounded px-2 py-1" onClick={()=>setPaused(p=>!p)}>{paused ? "▶︎ Reprendre" : "⏸ Pause"}</button>
+        <div className="flex gap-2">
+          <button onClick={() => setSfxOn(!sfxOn)} className="p-2 bg-white/10 rounded hover:bg-white/20 text-white transition">{sfxOn ? "🔊" : "🔇"}</button>
+          <button onClick={() => setStatus("MENU")} className="p-2 bg-white/10 rounded hover:bg-white/20 text-white text-xs font-bold tracking-widest uppercase transition">Menu</button>
+        </div>
+
+        <div className="text-right">
+          <div className="text-[10px] font-bold tracking-[0.2em] text-indigo-400/80 uppercase mb-1">Top</div>
+          <div className="text-2xl font-bold text-indigo-100 tabular-nums">{highScore}</div>
         </div>
       </div>
 
-      <div className="flex items-center justify-between mb-2">
-        <div className="font-semibold">Score: <span className="tabular-nums">{score}</span></div>
-        <div className="opacity-80">Meilleur ({sizeKey}) : <span className="tabular-nums">{best}</span></div>
-        <div className="w-40 h-2 bg-white/10 rounded overflow-hidden">
-          <div className="h-full bg-green-500" style={{ width: `${percent}%` }} />
-        </div>
-      </div>
-
-      <div className="relative">
+      {/* ZONE DE JEU (Remplit le parent) */}
+      <div className="w-full h-full relative group perspective-1000">
         <div
-          ref={gridRef}
-          className="grid gap-[2px] bg-[var(--border)] p-[2px] rounded aspect-square"
-          style={{
-            gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))`,
-            gridTemplateRows: `repeat(${rows}, minmax(0, 1fr))`,
-          }}
+          className="relative w-full h-full glass-panel rounded-xl overflow-hidden ring-1 ring-white/10 transition-transform duration-75"
+          style={{ transform: `translate(${shakeOffset.x}px, ${shakeOffset.y}px)` }}
         >
-          {Array.from({ length: rows * cols }).map((_, idx) => {
-            const x = idx % cols;
-            const y = Math.floor(idx / cols);
-            const isFood = food.x === x && food.y === y;
-            const idxSnake = snake.findIndex(s => s.x === x && s.y === y);
-            const isHead = idxSnake === 0;
-            const isBody = idxSnake > 0;
-            return (
-              <div key={idx} className="bg-[var(--card)] rounded-sm relative">
-                {isFood && <div className="w-full h-full rounded-sm" style={{ background: "radial-gradient(circle, rgba(255,100,100,0.95) 0%, rgba(255,0,0,0.8) 60%, transparent 70%)" }} />}
-                {isBody && <div className="w-full h-full rounded-sm opacity-90" style={{ background: "linear-gradient(180deg, rgba(20,184,110,1) 0%, rgba(7,140,86,1) 100%)" }} />}
-                {isHead && <div className="w-full h-full rounded-sm ring-2 ring-emerald-300" style={{ background: "linear-gradient(180deg, rgba(72,255,173,1) 0%, rgba(20,184,110,1) 100%)" }} />}
+          <div className="absolute inset-0 bg-grid-pattern opacity-30" style={{ backgroundSize: `${cellW}% ${cellH}%` }} />
+
+          <div className="absolute transform -translate-x-1/2 -translate-y-1/2 z-10" style={getStyle(food, 0.65)}>
+            <div className="w-full h-full rounded-full bg-amber-400 shadow-[0_0_20px_rgba(251,191,36,0.6)] animate-pulse" />
+          </div>
+
+          {visSnake.slice(1).map((p, i) => (
+            <div key={i} className="absolute transform -translate-x-1/2 -translate-y-1/2 rounded-full transition-transform"
+              style={{ ...getStyle(p, 1.05), backgroundColor: `rgba(16, 185, 129, ${Math.max(0.4, 1 - i / (visSnake.length + 5))})`, boxShadow: i < 5 ? `0 0 10px rgba(16, 185, 129, 0.3)` : 'none' }} />
+          ))}
+
+          {visSnake[0] && (
+            <div className={`absolute transform -translate-x-1/2 -translate-y-1/2 z-20 transition-transform duration-100 ease-linear ${getHeadRotation()}`} style={getStyle(visSnake[0], 1.15)}>
+              <div className="w-full h-full rounded-full bg-gradient-to-b from-emerald-300 to-emerald-600 glow-green relative">
+                <div className="absolute top-[30%] left-[20%] w-[25%] h-[25%] bg-black rounded-full opacity-80 shadow-inner"></div>
+                <div className="absolute top-[30%] right-[20%] w-[25%] h-[25%] bg-black rounded-full opacity-80 shadow-inner"></div>
               </div>
-            );
-          })}
-        </div>
-        <canvas ref={particleRef} className="pointer-events-none absolute inset-0"></canvas>
-      </div>
+            </div>
+          )}
 
-      {gameOver && (
-        <div className="mt-3 p-3 rounded border bg-white/5">
-          <div className="font-semibold mb-1">💀 Fin de partie</div>
-          <div className="text-sm opacity-80 mb-2">Score: {score} — Taille: {sizeKey}</div>
-          <button className="border rounded px-3 py-1" onClick={restart}>Rejouer</button>
-        </div>
-      )}
+          <canvas ref={canvasRef} className="absolute inset-0 pointer-events-none z-30 w-full h-full" />
 
-      <div className="mt-6">
-        <div className="flex items-center justify-between mb-2">
-          <h3 className="font-semibold">🏆 Leaderboard (local)</h3>
-          <button className="text-xs opacity-70 hover:opacity-100 underline" onClick={()=>lb.reset()}>Réinitialiser</button>
+          {status === "MENU" && (
+            <div className="absolute inset-0 bg-black/80 backdrop-blur-md grid place-items-center z-40 animate-in fade-in duration-300">
+              <div className="text-center w-full max-w-sm px-6">
+                <h1 className="text-6xl font-black text-transparent bg-clip-text bg-gradient-to-br from-emerald-400 via-teal-300 to-cyan-500 mb-8 drop-shadow-sm">SNAKE</h1>
+                <div className="flex items-center justify-between bg-white/5 rounded-lg p-3 mb-8 border border-white/10">
+                  <span className="text-sm text-gray-400 font-bold uppercase tracking-wider">Taille Grille</span>
+                  <select className="select-glass" value={`${cols}x${rows}`} onChange={e => { const [c, r] = e.target.value.split("x").map(Number); setCols(c); setRows(r); }}>
+                    {[10, 15, 20, 25, 30].map(n => <option key={n} value={`${n}x${n}`} className="bg-black">{n} × {n}</option>)}
+                  </select>
+                </div>
+                <button onClick={startGame} className="btn-primary w-full">JOUER</button>
+              </div>
+            </div>
+          )}
+
+          {status === "GAMEOVER" && (
+            <div className="absolute inset-0 bg-red-950/90 backdrop-blur-md grid place-items-center z-50 animate-in zoom-in-95 duration-200">
+              <div className="text-center">
+                <h2 className="text-5xl font-black text-white mb-2 glow-red">GAME OVER</h2>
+                <div className="text-xl text-white/70 mb-8 font-mono">SCORE: {score}</div>
+                <button onClick={startGame} className="btn-primary">REJOUER</button>
+              </div>
+            </div>
+          )}
+
+          {status === "PAUSED" && (
+            <div className="absolute inset-0 bg-black/60 backdrop-blur-sm grid place-items-center z-50">
+              <div className="text-6xl font-black text-white/20 tracking-[0.5em] uppercase pointer-events-none">Pause</div>
+            </div>
+          )}
         </div>
-        <table className="w-full text-sm border-separate border-spacing-y-1">
-          <thead className="opacity-70">
-            <tr><th className="text-left">#</th><th className="text-left">Score</th><th>Taille</th><th>Date</th></tr>
-          </thead>
-          <tbody>
-            {lb.list(sizeKey).map((e, i)=>(
-              <tr key={i}>
-                <td>{i+1}</td>
-                <td className="font-semibold tabular-nums">{e.score}</td>
-                <td>{e.size}</td>
-                <td>{new Date(e.date).toLocaleString()}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
       </div>
     </div>
   );

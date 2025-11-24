@@ -1,16 +1,14 @@
 ---
 import Base from "../layouts/Base.astro";
-import Hero from "../components/Hero";
+import SnakeGame from "../components/SnakeGame";
 ---
-<Base title="Enzo Oriol — Portfolio">
-  <Hero client:load />
-  <section class="grid md:grid-cols-3 gap-5">
-    <a class="asus-rog-card" href="/projects">Derniers projets</a>
-    <a class="asus-rog-card" href="/resume">CV & compétences</a>
-    <a class="asus-rog-card" href="/contact">Contact</a>
+
+<Base>
+  <section
+    class="relative z-10 w-full flex justify-center items-center h-[100svh]"
+  >
+    <div class="w-[min(90vw,85vh)] aspect-square">
+      <SnakeGame client:load />
+    </div>
   </section>
 </Base>
-
-
-<!-- Lien vers le jeu -->
-<p class="mt-6 text-center"><a class="underline" href="/snake">Jouer à Snake</a></p>
