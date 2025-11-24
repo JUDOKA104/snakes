@@ -5,6 +5,6 @@ export default defineConfig({
   integrations: [react()],
   output: 'static',
   site: 'https://judoka104.github.io/snakes',
-  base: '/',
+  base: '/snakes',
   prefetch: true
 });
