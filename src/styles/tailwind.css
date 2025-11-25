@@ -2,71 +2,104 @@
 @tailwind components;
 @tailwind utilities;
 
-/* ===== Base ===== */
 :root {
-  --bg-deep: #000000;
-  --glass-border: rgba(255, 255, 255, 0.15);
-  --glass-surface: rgba(20, 20, 20, 0.6);
-  --neon-primary: #10b981;
+  --bg-deep: #050505;
+  --neon-primary: #00f2ff;
+  /* Cyan Electrique */
+  --neon-secondary: #ff0055;
+  /* Magenta */
 }
 
 html,
 body {
   background-color: var(--bg-deep);
   color: #e5e7eb;
-  font-family: 'Inter', sans-serif;
+  font-family: 'Inter', system-ui, sans-serif;
   overflow: hidden;
-  /* Pas de scroll */
   height: 100%;
   width: 100%;
   margin: 0;
   padding: 0;
 }
 
-/* ===== Utilitaires Custom ===== */
 @layer utilities {
-  .bg-dark-theme {
-    background-color: var(--bg-deep);
+
+  /* Effet Scanline (Lignes TV) */
+  .scanlines {
+    background: linear-gradient(to bottom,
+        rgba(255, 255, 255, 0),
+        rgba(255, 255, 255, 0) 50%,
+        rgba(0, 0, 0, 0.2) 50%,
+        rgba(0, 0, 0, 0.2));
+    background-size: 100% 4px;
+    pointer-events: none;
   }
 
-  .glass-panel {
-    @apply backdrop-blur-xl border shadow-2xl;
-    background-color: var(--glass-surface);
-    border-color: var(--glass-border);
+  /* Vignette pour assombrir les coins */
+  .vignette {
+    background: radial-gradient(circle, transparent 50%, black 120%);
+    pointer-events: none;
   }
 
-  .glow-text-green {
-    text-shadow: 0 0 25px rgba(16, 185, 129, 0.8);
+  /* Panneau de verre sombre */
+  .glass-dark {
+    @apply backdrop-blur-md border border-white/10 shadow-2xl;
+    background: rgba(10, 10, 12, 0.7);
   }
 
-  .glow-green {
-    box-shadow: 0 0 20px rgba(16, 185, 129, 0.5), inset 0 0 10px rgba(16, 185, 129, 0.2);
-  }
-
-  .bg-grid-pattern {
+  /* Grille Cyberpunk */
+  .bg-cyber-grid {
+    background-size: 40px 40px;
     background-image:
-      linear-gradient(to right, rgba(255, 255, 255, 0.07) 1px, transparent 1px),
-      linear-gradient(to bottom, rgba(255, 255, 255, 0.07) 1px, transparent 1px);
-    background-size: 50px 50px;
-    /* Grille plus large */
-    mask-image: radial-gradient(circle at center, black 50%, transparent 100%);
+      linear-gradient(to right, rgba(255, 255, 255, 0.03) 1px, transparent 1px),
+      linear-gradient(to bottom, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
+    mask-image: radial-gradient(circle at center, black 40%, transparent 100%);
   }
 }
 
-/* ===== Composants UI ===== */
-.btn-primary {
-  @apply rounded-full px-8 py-4 font-black text-black tracking-widest uppercase transition-transform hover:scale-105 active:scale-95 text-lg;
-  background: linear-gradient(135deg, #34d399 0%, #10b981 100%);
-  box-shadow: 0 0 25px rgba(16, 185, 129, 0.5);
+/* Animations custom */
+@keyframes spin-slow {
+  from {
+    transform: translate(-50%, -50%) rotate(0deg);
+  }
+
+  to {
+    transform: translate(-50%, -50%) rotate(360deg);
+  }
 }
 
-.select-glass {
-  @apply appearance-none border rounded-md px-4 py-2 text-base text-white focus:outline-none focus:ring-1 focus:ring-emerald-500 transition-colors cursor-pointer font-medium;
-  background-color: rgba(255, 255, 255, 0.05);
-  border-color: rgba(255, 255, 255, 0.2);
-  background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%23ffffff' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M6 8l4 4 4-4'/%3e%3c/svg%3e");
-  background-position: right 0.75rem center;
-  background-repeat: no-repeat;
-  background-size: 1.2em 1.2em;
-  padding-right: 2.5rem;
+@keyframes spin-reverse {
+  from {
+    transform: translate(-50%, -50%) rotate(360deg);
+  }
+
+  to {
+    transform: translate(-50%, -50%) rotate(0deg);
+  }
+}
+
+@keyframes pulse-glow {
+
+  0%,
+  100% {
+    opacity: 0.8;
+    transform: translate(-50%, -50%) scale(1);
+  }
+
+  50% {
+    opacity: 0.4;
+    transform: translate(-50%, -50%) scale(1.1);
+  }
+}
+
+.animate-spin-slow {
+  animation: spin-slow 8s linear infinite;
+}
+
+.animate-spin-reverse {
+  animation: spin-reverse 6s linear infinite;
+}
+
+.animate-pulse-glow {
+  animation: pulse-glow 3s ease-in-out infinite;
 }
